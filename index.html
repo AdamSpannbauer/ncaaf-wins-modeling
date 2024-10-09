@@ -2857,7 +2857,7 @@ border-radius: 0px;
 
 <h1 class="title toc-ignore">Intro <code>tidymodels</code></h1>
 <h4 class="author">Us</h4>
-<h4 class="date">2024-10-09 09:54:18.039386</h4>
+<h4 class="date">2024-10-09 10:26:54.759353</h4>
 
 </div>
 
@@ -2870,149 +2870,6 @@ happened this past weekend… Let’s dig for hope in the data.</p>
 practice and exposure to the <code>tidymodels</code> way of doing
 things.</p>
 <hr />
-<div id="vocab-wordsideasfunctions" class="section level2">
-<h2>Vocab words/ideas/functions</h2>
-<ul>
-<li><p>Supervised learning - models that make predictions that we can
-measure accuracy of (y = mX + b)</p>
-<ul>
-<li><p>Ex: predict temperature tomorrow, I can check how close you
-were</p></li>
-<li><p>Unsupervised learning methods (clustering and arules) don’t have
-this type of error measuring built in this directly (all X no
-y)</p></li>
-</ul></li>
-<li><p>“Predictors / features / X” vs “target / response / y” vs IDs</p>
-<ul>
-<li><p>We will use predictor variables to predict target
-variables</p></li>
-<li><p>We will use features to predict a response</p></li>
-<li><p>We will use X to predict y</p></li>
-<li><p>IDs are generally not useful for predictions and excluded from
-models</p></li>
-</ul></li>
-<li><p>What makes a good predictive model? Simplicity?
-Accuracy?</p></li>
-<li><p>Residual / error</p>
-<ul>
-<li><p><span class="math inline">\(residual = y - \hat{y}\)</span> -
-over predictions have negative residuals (we’ll often square or absolute
-value when summarizing residuals to remove negatives)</p>
-<ul>
-<li><span class="math inline">\(y\)</span> (actual) vs <span class="math inline">\(\hat{y}\)</span> (predicted/estimated) - wizards
-make predictions; they have pointy hats</li>
-</ul></li>
-</ul></li>
-<li><p>Summarizing residuals ( <span class="math inline">\(n\)</span> is
-sample size, <span class="math inline">\(y\)</span> is observed y, <span class="math inline">\(\hat{y}\)</span> is predicted y, <span class="math inline">\(\sum\)</span> means sum, and <span class="math inline">\(\frac{1}{n}\sum{y_i}\)</span> would mean average
-<span class="math inline">\(y\)</span>)</p>
-<ul>
-<li><p>RMSE - Root mean square error - <span class="math inline">\(\sqrt{\frac{1}{n}\sum{(y_i -
-\hat{y_i})^2}}\)</span></p></li>
-<li><p>MAE - Mean absolute error - <span class="math inline">\(\frac{1}{n}\sum{|y_i -
-\hat{y_i}|}\)</span></p></li>
-</ul></li>
-<li><p>Data prep <code>recipe()</code>s</p>
-<ul>
-<li><p><code>update_role(id_var, new_role = &quot;ID&quot;)</code> - tell model
-not to use a column but don’t drop it</p></li>
-<li><p>Some cleaning steps</p>
-<ul>
-<li><p><code>step_naomit()</code> - exclude records with missing
-values</p></li>
-<li><p><code>step_corr()</code> - remove correlated features</p></li>
-<li><p><code>step_lincomb()</code> - remove features to not have any
-linear combinations (e.g. bmi is linear combo of height and
-weight)</p></li>
-<li><p><code>step_nzv()</code> - remove features with near zero
-variance</p></li>
-<li><p><code>step_dummy()</code> - creates dummy variables from factor
-predictors</p></li>
-</ul></li>
-<li><p>What columns to apply steps to (not an exhaustive list); used
-within steps (e.g. <code>step_dummy(all_nominal_predictors)</code> and
-<code>step_nzv(all_predictors())</code> )</p>
-<ul>
-<li><p><code>all_numeric_predictors()</code> - apply to all numeric
-X</p></li>
-<li><p><code>all_nominal_predictors()</code> - apply to all numeric
-X</p></li>
-<li><p><code>all_predictors()</code> - apply to all X regardless of data
-type</p></li>
-<li><p><code>all_numeric()</code> - apply to all numeric X and
-y</p></li>
-</ul></li>
-<li><p>To use a <code>recipe()</code></p>
-<ul>
-<li><p>Run <code>prep()</code> on your recipe to see status print outs
-and debug as needed</p></li>
-<li><p>Add your <code>recipe()</code> to a model <code>workflow()</code>
-with <code>add_recipe()</code> so data is pre-processed in your
-workflow</p></li>
-<li><p>Apply your <code>recipe()</code> using <code>prep()</code> +
-<code>bake()</code> - less common, but useful to see what your models
-will be seeing. Also useful if using recipes for cleaning before
-unsupervised learning (e.g. clustering).</p></li>
-</ul></li>
-</ul></li>
-<li><p>Fitting models <code>workflow()</code></p>
-<ul>
-<li><p>Define a data cleaning recipe:</p>
-<ul>
-<li><code>my_recipe &lt;- recipe(y ~ ., data = my_df) |&gt; step_corr(all_predictors())</code></li>
-</ul></li>
-<li><p>Define a model:</p>
-<ul>
-<li><code>my_lm &lt;- linear_reg()</code> (we’ll see many more model
-types and options)</li>
-</ul></li>
-<li><p>Define a workflow and add the recipe and model to the work
-flow</p>
-<ul>
-<li><code>my_workflow &lt;- workflow() |&gt; add_recipe(my_recipe) |&gt; add_model(my_lm)</code></li>
-</ul></li>
-<li><p>Fit workflow to data</p>
-<ul>
-<li><code>my_fit_workflow &lt;- my_workflow() |&gt; fit(my_df)</code></li>
-</ul></li>
-<li><p>Make predictions on new data (recipe’s cleaning is applied before
-model makes predictions)</p>
-<ul>
-<li><code>my_fit_workflow |&gt; predict(new_data = my_new_df)</code></li>
-</ul></li>
-</ul></li>
-<li><p>Measuring accuracy with <code>metrics()</code></p>
-<ul>
-<li><p>Create a data.frame with both the actual value ( <span class="math inline">\(y\)</span> ) and the predicted value ( <span class="math inline">\(\hat{y}\)</span> )</p>
-<ul>
-<li>E.g.
-<code>my_df_w_preds &lt;- my_fit_workflow |&gt; predict(new_data = my_new_df) |&gt; bind_cols(my_new_df)</code>
-(this works if <code>my_new_df</code> has the predictors and target in
-it)</li>
-</ul></li>
-<li><p>Use <code>metrics()</code> function and tell it what the
-<code>truth</code> is and what your <code>estimate</code> is</p>
-<ul>
-<li><p>E.g.
-<code>data_w_preds |&gt; metrics(truth = actual_y, estimate = .pred)</code></p>
-<ul>
-<li>By default, <code>predict()</code> names the predicted value
-<code>.pred</code></li>
-</ul></li>
-</ul></li>
-</ul></li>
-<li><p>Extracting model object with
-<code>extract_fit_engine()</code></p>
-<ul>
-<li><p>E.g.
-<code>fit_model &lt;- y_fit_workflow``|&gt; extract_fit_engine()</code></p></li>
-<li><p>Useful if you want to do something specific to that model type.
-For example, do this to apply <code>summary()</code> to a fit linear
-regression model.</p></li>
-</ul></li>
-</ul>
-<hr />
-</div>
 <div id="data-overview" class="section level2">
 <h2>Data overview</h2>
 <p>The data was scraped on 2024-10-08 from <a href="https://sports-reference.com">sports-reference.com</a>. The
@@ -3464,8 +3321,213 @@ are typically within +/-1.7 games of correct win total.</p>
 {"columns":[{"label":[".pred"],"name":[1],"type":["dbl"],"align":["right"]},{"label":["year"],"name":[2],"type":["int"],"align":["right"]},{"label":["team"],"name":[3],"type":["chr"],"align":["left"]},{"label":["win_count"],"name":[4],"type":["int"],"align":["right"]},{"label":["win_count_w7"],"name":[5],"type":["int"],"align":["right"]},{"label":["points_scored_w7"],"name":[6],"type":["int"],"align":["right"]},{"label":["points_allowed_w7"],"name":[7],"type":["int"],"align":["right"]},{"label":["winloss_w7"],"name":[8],"type":["dbl"],"align":["right"]},{"label":["residual"],"name":[9],"type":["dbl"],"align":["right"]}],"data":[{"1":"9.916254","2":"2024","3":"Tennessee","4":"NA","5":"4","6":"230","7":"47","8":"0.8","9":"NA"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
   </script>
 </div>
-<hr />
 </div>
+<div id="full-tidymodels-workflow-fit-in-one-cell" class="section level3">
+<h3>Full <code>tidymodels</code> workflow fit in one cell</h3>
+<pre class="r"><code># Define data cleaning recipe
+ncaa_recipe &lt;- recipe(win_count ~ ., data = model_data) |&gt;
+  update_role(year, new_role = &quot;ID&quot;) |&gt;
+  update_role(team, new_role = &quot;ID&quot;) |&gt;
+  step_naomit(all_numeric_predictors()) |&gt;
+  step_corr(all_numeric_predictors()) |&gt;
+  step_lincomb(all_numeric_predictors()) |&gt;
+  step_nzv(all_numeric_predictors())
+
+# Define model
+ncaa_lm &lt;- linear_reg()
+
+# Create workflow with recipe + model
+ncaa_workflow &lt;- workflow() |&gt;
+  add_recipe(ncaa_recipe) |&gt;
+  add_model(ncaa_lm)
+
+# Fit workflow to your data
+ncaa_fit &lt;- ncaa_workflow |&gt;
+  fit(model_data)
+
+# Make predictions with your fit model workflow
+data_w_preds &lt;- ncaa_fit |&gt;
+  predict(model_data) |&gt;
+  bind_cols(model_data) |&gt;
+  mutate(residual = win_count - .pred)
+
+# Assess performance
+data_w_preds |&gt;
+  metrics(truth = win_count, estimate = .pred)</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":[".metric"],"name":[1],"type":["chr"],"align":["left"]},{"label":[".estimator"],"name":[2],"type":["chr"],"align":["left"]},{"label":[".estimate"],"name":[3],"type":["dbl"],"align":["right"]}],"data":[{"1":"rmse","2":"standard","3":"1.7738777"},{"1":"rsq","2":"standard","3":"0.6603258"},{"1":"mae","2":"standard","3":"1.4236906"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<pre class="r"><code># Interact with your model object as needed
+ncaa_fit |&gt;
+  extract_fit_engine() |&gt;
+  summary()</code></pre>
+<pre><code>## 
+## Call:
+## stats::lm(formula = ..y ~ ., data = data)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -4.8251 -1.2604 -0.1356  1.1387  6.1361 
+## 
+## Coefficients:
+##                    Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)        3.918617   0.299779  13.072  &lt; 2e-16 ***
+## win_count_w7       1.080824   0.068740  15.723  &lt; 2e-16 ***
+## points_scored_w7   0.010624   0.001688   6.294 4.47e-10 ***
+## points_allowed_w7 -0.016364   0.001464 -11.179  &lt; 2e-16 ***
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## Residual standard error: 1.777 on 1095 degrees of freedom
+##   (135 observations deleted due to missingness)
+## Multiple R-squared:  0.6603, Adjusted R-squared:  0.6594 
+## F-statistic: 709.6 on 3 and 1095 DF,  p-value: &lt; 2.2e-16</code></pre>
+</div>
+</div>
+<div id="vocab-wordsideasfunctions" class="section level2">
+<h2>Vocab words/ideas/functions</h2>
+<ul>
+<li><p>Supervised learning - models that make predictions that we can
+measure accuracy of (y = mX + b)</p>
+<ul>
+<li><p>Ex: predict temperature tomorrow, I can check how close you
+were</p></li>
+<li><p>Unsupervised learning methods (clustering and arules) don’t have
+this type of error measuring built in this directly (all X no
+y)</p></li>
+</ul></li>
+<li><p>“Predictors / features / X” vs “target / response / y” vs IDs</p>
+<ul>
+<li><p>We will use predictor variables to predict target
+variables</p></li>
+<li><p>We will use features to predict a response</p></li>
+<li><p>We will use X to predict y</p></li>
+<li><p>IDs are generally not useful for predictions and excluded from
+models</p></li>
+</ul></li>
+<li><p>What makes a good predictive model? Simplicity?
+Accuracy?</p></li>
+<li><p>Residual / error</p>
+<ul>
+<li><p><span class="math inline">\(residual = y - \hat{y}\)</span> -
+over predictions have negative residuals (we’ll often square or absolute
+value when summarizing residuals to remove negatives)</p>
+<ul>
+<li><span class="math inline">\(y\)</span> (actual) vs <span class="math inline">\(\hat{y}\)</span> (predicted/estimated) - wizards
+make predictions; they have pointy hats</li>
+</ul></li>
+</ul></li>
+<li><p>Summarizing residuals ( <span class="math inline">\(n\)</span> is
+sample size, <span class="math inline">\(y\)</span> is observed y, <span class="math inline">\(\hat{y}\)</span> is predicted y, <span class="math inline">\(\sum\)</span> means sum, and <span class="math inline">\(\frac{1}{n}\sum{y_i}\)</span> would mean average
+<span class="math inline">\(y\)</span>)</p>
+<ul>
+<li><p>RMSE - Root mean square error - <span class="math inline">\(\sqrt{\frac{1}{n}\sum{(y_i -
+\hat{y_i})^2}}\)</span></p></li>
+<li><p>MAE - Mean absolute error - <span class="math inline">\(\frac{1}{n}\sum{|y_i -
+\hat{y_i}|}\)</span></p></li>
+</ul></li>
+<li><p>Data prep <code>recipe()</code>s</p>
+<ul>
+<li><p><code>update_role(id_var, new_role = &quot;ID&quot;)</code> - tell model
+not to use a column but don’t drop it</p></li>
+<li><p>Some cleaning steps</p>
+<ul>
+<li><p><code>step_naomit()</code> - exclude records with missing
+values</p></li>
+<li><p><code>step_corr()</code> - remove correlated features</p></li>
+<li><p><code>step_lincomb()</code> - remove features to not have any
+linear combinations (e.g. bmi is linear combo of height and
+weight)</p></li>
+<li><p><code>step_nzv()</code> - remove features with near zero
+variance</p></li>
+<li><p><code>step_dummy()</code> - creates dummy variables from factor
+predictors</p></li>
+</ul></li>
+<li><p>What columns to apply steps to (not an exhaustive list); used
+within steps (e.g. <code>step_dummy(all_nominal_predictors)</code> and
+<code>step_nzv(all_predictors())</code> )</p>
+<ul>
+<li><p><code>all_numeric_predictors()</code> - apply to all numeric
+X</p></li>
+<li><p><code>all_nominal_predictors()</code> - apply to all numeric
+X</p></li>
+<li><p><code>all_predictors()</code> - apply to all X regardless of data
+type</p></li>
+<li><p><code>all_numeric()</code> - apply to all numeric X and
+y</p></li>
+</ul></li>
+<li><p>To use a <code>recipe()</code></p>
+<ul>
+<li><p>Run <code>prep()</code> on your recipe to see status print outs
+and debug as needed</p></li>
+<li><p>Add your <code>recipe()</code> to a model <code>workflow()</code>
+with <code>add_recipe()</code> so data is pre-processed in your
+workflow</p></li>
+<li><p>Apply your <code>recipe()</code> using <code>prep()</code> +
+<code>bake()</code> - less common, but useful to see what your models
+will be seeing. Also useful if using recipes for cleaning before
+unsupervised learning (e.g. clustering).</p></li>
+</ul></li>
+</ul></li>
+<li><p>Fitting models <code>workflow()</code></p>
+<ul>
+<li><p>Define a data cleaning recipe:</p>
+<ul>
+<li><code>my_recipe &lt;- recipe(y ~ ., data = my_df) |&gt; step_corr(all_predictors())</code></li>
+</ul></li>
+<li><p>Define a model:</p>
+<ul>
+<li><code>my_lm &lt;- linear_reg()</code> (we’ll see many more model
+types and options)</li>
+</ul></li>
+<li><p>Define a workflow and add the recipe and model to the work
+flow</p>
+<ul>
+<li><code>my_workflow &lt;- workflow() |&gt; add_recipe(my_recipe) |&gt; add_model(my_lm)</code></li>
+</ul></li>
+<li><p>Fit workflow to data</p>
+<ul>
+<li><code>my_fit_workflow &lt;- my_workflow() |&gt; fit(my_df)</code></li>
+</ul></li>
+<li><p>Make predictions on new data (recipe’s cleaning is applied before
+model makes predictions)</p>
+<ul>
+<li><code>my_fit_workflow |&gt; predict(new_data = my_new_df)</code></li>
+</ul></li>
+</ul></li>
+<li><p>Measuring accuracy with <code>metrics()</code></p>
+<ul>
+<li><p>Create a data.frame with both the actual value ( <span class="math inline">\(y\)</span> ) and the predicted value ( <span class="math inline">\(\hat{y}\)</span> )</p>
+<ul>
+<li>E.g.
+<code>my_df_w_preds &lt;- my_fit_workflow |&gt; predict(new_data = my_new_df) |&gt; bind_cols(my_new_df)</code>
+(this works if <code>my_new_df</code> has the predictors and target in
+it)</li>
+</ul></li>
+<li><p>Use <code>metrics()</code> function and tell it what the
+<code>truth</code> is and what your <code>estimate</code> is</p>
+<ul>
+<li><p>E.g.
+<code>data_w_preds |&gt; metrics(truth = actual_y, estimate = .pred)</code></p>
+<ul>
+<li>By default, <code>predict()</code> names the predicted value
+<code>.pred</code></li>
+</ul></li>
+</ul></li>
+</ul></li>
+<li><p>Extracting model object with
+<code>extract_fit_engine()</code></p>
+<ul>
+<li><p>E.g.
+<code>fit_model &lt;- y_fit_workflow``|&gt; extract_fit_engine()</code></p></li>
+<li><p>Useful if you want to do something specific to that model type.
+For example, do this to apply <code>summary()</code> to a fit linear
+regression model.</p></li>
+</ul></li>
+</ul>
+<hr />
 </div>
 <div id="the-scraping-code" class="section level2">
 <h2>The scraping code</h2>

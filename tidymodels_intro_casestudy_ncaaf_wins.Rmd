@@ -25,118 +25,6 @@ We'll have the goal of some hands-on data manipulation+regression practice and e
 
 ------------------------------------------------------------------------
 
-## Vocab words/ideas/functions
-
--   Supervised learning - models that make predictions that we can measure accuracy of (y = mX + b)
-
-    -   Ex: predict temperature tomorrow, I can check how close you were
-
-    -   Unsupervised learning methods (clustering and arules) don't have this type of error measuring built in this directly (all X no y)
-
--   "Predictors / features / X" vs "target / response / y" vs IDs
-
-    -   We will use predictor variables to predict target variables
-
-    -   We will use features to predict a response
-
-    -   We will use X to predict y
-
-    -   IDs are generally not useful for predictions and excluded from models
-
--   What makes a good predictive model?
-    Simplicity?
-    Accuracy?
-
--   Residual / error
-
-    -   $residual = y - \hat{y}$ - over predictions have negative residuals (we'll often square or absolute value when summarizing residuals to remove negatives)
-
-        -   $y$ (actual) vs $\hat{y}$ (predicted/estimated) - wizards make predictions; they have pointy hats
-
--   Summarizing residuals ( $n$ is sample size, $y$ is observed y, $\hat{y}$ is predicted y, $\sum$ means sum, and $\frac{1}{n}\sum{y_i}$ would mean average $y$)
-
-    -   RMSE - Root mean square error - $\sqrt{\frac{1}{n}\sum{(y_i - \hat{y_i})^2}}$
-
-    -   MAE - Mean absolute error - $\frac{1}{n}\sum{|y_i - \hat{y_i}|}$
-
--   Data prep `recipe()`s
-
-    -   `update_role(id_var, new_role = "ID")` - tell model not to use a column but don't drop it
-
-    -   Some cleaning steps
-
-        -   `step_naomit()` - exclude records with missing values
-
-        -   `step_corr()` - remove correlated features
-
-        -   `step_lincomb()` - remove features to not have any linear combinations (e.g. bmi is linear combo of height and weight)
-
-        -   `step_nzv()` - remove features with near zero variance
-
-        -   `step_dummy()` - creates dummy variables from factor predictors
-
-    -   What columns to apply steps to (not an exhaustive list); used within steps (e.g. `step_dummy(all_nominal_predictors)` and `step_nzv(all_predictors())` )
-
-        -   `all_numeric_predictors()` - apply to all numeric X
-
-        -   `all_nominal_predictors()` - apply to all numeric X
-
-        -   `all_predictors()` - apply to all X regardless of data type
-
-        -   `all_numeric()` - apply to all numeric X and y
-
-    -   To use a `recipe()`
-
-        -   Run `prep()` on your recipe to see status print outs and debug as needed
-
-        -   Add your `recipe()` to a model `workflow()` with `add_recipe()` so data is pre-processed in your workflow
-
-        -   Apply your `recipe()` using `prep()` + `bake()` - less common, but useful to see what your models will be seeing.
-            Also useful if using recipes for cleaning before unsupervised learning (e.g. clustering).
-
--   Fitting models `workflow()`
-
-    -   Define a data cleaning recipe:
-
-        -   `my_recipe <- recipe(y ~ ., data = my_df) |> step_corr(all_predictors())`
-
-    -   Define a model:
-
-        -   `my_lm <- linear_reg()` (we'll see many more model types and options)
-
-    -   Define a workflow and add the recipe and model to the work flow
-
-        -   `my_workflow <- workflow() |> add_recipe(my_recipe) |> add_model(my_lm)`
-
-    -   Fit workflow to data
-
-        -   `my_fit_workflow <- my_workflow() |> fit(my_df)`
-
-    -   Make predictions on new data (recipe's cleaning is applied before model makes predictions)
-
-        -   `my_fit_workflow |> predict(new_data = my_new_df)`
-
--   Measuring accuracy with `metrics()`
-
-    -   Create a data.frame with both the actual value ( $y$ ) and the predicted value ( $\hat{y}$ )
-
-        -   E.g. `my_df_w_preds <- my_fit_workflow |> predict(new_data = my_new_df) |> bind_cols(my_new_df)` (this works if `my_new_df` has the predictors and target in it)
-
-    -   Use `metrics()` function and tell it what the `truth` is and what your `estimate` is
-
-        -   E.g. `data_w_preds |> metrics(truth = actual_y, estimate = .pred)`
-
-            -   By default, `predict()` names the predicted value `.pred`
-
--   Extracting model object with `extract_fit_engine()`
-
-    -   E.g. ``` fit_model <- y_fit_workflow``|> extract_fit_engine() ```
-
-    -   Useful if you want to do something specific to that model type.
-        For example, do this to apply `summary()` to a fit linear regression model.
-
-------------------------------------------------------------------------
-
 ## Data overview
 
 The data was scraped on 2024-10-08 from [sports-reference.com](https://sports-reference.com).
@@ -528,6 +416,156 @@ data_w_preds |>
   filter(team == "Tennessee") |>
   filter(year == 2024)
 ```
+
+### Full `tidymodels` workflow fit in one cell
+
+```{r tidy_fit_chunk}
+# Define data cleaning recipe
+ncaa_recipe <- recipe(win_count ~ ., data = model_data) |>
+  update_role(year, new_role = "ID") |>
+  update_role(team, new_role = "ID") |>
+  step_naomit(all_numeric_predictors()) |>
+  step_corr(all_numeric_predictors()) |>
+  step_lincomb(all_numeric_predictors()) |>
+  step_nzv(all_numeric_predictors())
+
+# Define model
+ncaa_lm <- linear_reg()
+
+# Create workflow with recipe + model
+ncaa_workflow <- workflow() |>
+  add_recipe(ncaa_recipe) |>
+  add_model(ncaa_lm)
+
+# Fit workflow to your data
+ncaa_fit <- ncaa_workflow |>
+  fit(model_data)
+
+# Make predictions with your fit model workflow
+data_w_preds <- ncaa_fit |>
+  predict(model_data) |>
+  bind_cols(model_data) |>
+  mutate(residual = win_count - .pred)
+
+# Assess performance
+data_w_preds |>
+  metrics(truth = win_count, estimate = .pred)
+
+# Interact with your model object as needed
+ncaa_fit |>
+  extract_fit_engine() |>
+  summary()
+```
+
+## Vocab words/ideas/functions
+
+-   Supervised learning - models that make predictions that we can measure accuracy of (y = mX + b)
+
+    -   Ex: predict temperature tomorrow, I can check how close you were
+
+    -   Unsupervised learning methods (clustering and arules) don't have this type of error measuring built in this directly (all X no y)
+
+-   "Predictors / features / X" vs "target / response / y" vs IDs
+
+    -   We will use predictor variables to predict target variables
+
+    -   We will use features to predict a response
+
+    -   We will use X to predict y
+
+    -   IDs are generally not useful for predictions and excluded from models
+
+-   What makes a good predictive model?
+    Simplicity?
+    Accuracy?
+
+-   Residual / error
+
+    -   $residual = y - \hat{y}$ - over predictions have negative residuals (we'll often square or absolute value when summarizing residuals to remove negatives)
+
+        -   $y$ (actual) vs $\hat{y}$ (predicted/estimated) - wizards make predictions; they have pointy hats
+
+-   Summarizing residuals ( $n$ is sample size, $y$ is observed y, $\hat{y}$ is predicted y, $\sum$ means sum, and $\frac{1}{n}\sum{y_i}$ would mean average $y$)
+
+    -   RMSE - Root mean square error - $\sqrt{\frac{1}{n}\sum{(y_i - \hat{y_i})^2}}$
+
+    -   MAE - Mean absolute error - $\frac{1}{n}\sum{|y_i - \hat{y_i}|}$
+
+-   Data prep `recipe()`s
+
+    -   `update_role(id_var, new_role = "ID")` - tell model not to use a column but don't drop it
+
+    -   Some cleaning steps
+
+        -   `step_naomit()` - exclude records with missing values
+
+        -   `step_corr()` - remove correlated features
+
+        -   `step_lincomb()` - remove features to not have any linear combinations (e.g. bmi is linear combo of height and weight)
+
+        -   `step_nzv()` - remove features with near zero variance
+
+        -   `step_dummy()` - creates dummy variables from factor predictors
+
+    -   What columns to apply steps to (not an exhaustive list); used within steps (e.g. `step_dummy(all_nominal_predictors)` and `step_nzv(all_predictors())` )
+
+        -   `all_numeric_predictors()` - apply to all numeric X
+
+        -   `all_nominal_predictors()` - apply to all numeric X
+
+        -   `all_predictors()` - apply to all X regardless of data type
+
+        -   `all_numeric()` - apply to all numeric X and y
+
+    -   To use a `recipe()`
+
+        -   Run `prep()` on your recipe to see status print outs and debug as needed
+
+        -   Add your `recipe()` to a model `workflow()` with `add_recipe()` so data is pre-processed in your workflow
+
+        -   Apply your `recipe()` using `prep()` + `bake()` - less common, but useful to see what your models will be seeing.
+            Also useful if using recipes for cleaning before unsupervised learning (e.g. clustering).
+
+-   Fitting models `workflow()`
+
+    -   Define a data cleaning recipe:
+
+        -   `my_recipe <- recipe(y ~ ., data = my_df) |> step_corr(all_predictors())`
+
+    -   Define a model:
+
+        -   `my_lm <- linear_reg()` (we'll see many more model types and options)
+
+    -   Define a workflow and add the recipe and model to the work flow
+
+        -   `my_workflow <- workflow() |> add_recipe(my_recipe) |> add_model(my_lm)`
+
+    -   Fit workflow to data
+
+        -   `my_fit_workflow <- my_workflow() |> fit(my_df)`
+
+    -   Make predictions on new data (recipe's cleaning is applied before model makes predictions)
+
+        -   `my_fit_workflow |> predict(new_data = my_new_df)`
+
+-   Measuring accuracy with `metrics()`
+
+    -   Create a data.frame with both the actual value ( $y$ ) and the predicted value ( $\hat{y}$ )
+
+        -   E.g. `my_df_w_preds <- my_fit_workflow |> predict(new_data = my_new_df) |> bind_cols(my_new_df)` (this works if `my_new_df` has the predictors and target in it)
+
+    -   Use `metrics()` function and tell it what the `truth` is and what your `estimate` is
+
+        -   E.g. `data_w_preds |> metrics(truth = actual_y, estimate = .pred)`
+
+            -   By default, `predict()` names the predicted value `.pred`
+
+-   Extracting model object with `extract_fit_engine()`
+
+    -   E.g. ``` fit_model <- y_fit_workflow``|> extract_fit_engine() ```
+
+    -   Useful if you want to do something specific to that model type.
+        For example, do this to apply `summary()` to a fit linear regression model.
 
 ------------------------------------------------------------------------
 
