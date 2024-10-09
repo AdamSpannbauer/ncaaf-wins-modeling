@@ -1,6 +1,6 @@
 ---
-title: "Intro `tidymodels`"
-author: "Us"
+title: "Predicting season win totals NCAA football 2024"
+author: "Me"
 date: "`r Sys.time()`"
 output: 
   html_document:
