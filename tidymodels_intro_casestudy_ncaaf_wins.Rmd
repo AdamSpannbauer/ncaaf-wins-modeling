@@ -1,0 +1,589 @@
+---
+title: "Intro `tidymodels`"
+author: "Us"
+date: "`r Sys.time()`"
+output: 
+  html_document:
+    code_folding: show
+    df_print: paged
+    theme: flatly
+    toc: true
+    toc_float: true
+    toc_depth: 4
+---
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(tidymodels)
+```
+
+Let's play with NCAA football data from this year...
+some tough stuff happened this past weekend...
+Let's dig for hope in the data.
+
+We'll have the goal of some hands-on data manipulation+regression practice and exposure to the `tidymodels` way of doing things.
+
+------------------------------------------------------------------------
+
+## Vocab words/ideas/functions
+
+-   Supervised learning - models that make predictions that we can measure accuracy of (y = mX + b)
+
+    -   Ex: predict temperature tomorrow, I can check how close you were
+
+    -   Unsupervised learning methods (clustering and arules) don't have this type of error measuring built in this directly (all X no y)
+
+-   "Predictors / features / X" vs "target / response / y" vs IDs
+
+    -   We will use predictor variables to predict target variables
+
+    -   We will use features to predict a response
+
+    -   We will use X to predict y
+
+    -   IDs are generally not useful for predictions and excluded from models
+
+-   What makes a good predictive model?
+    Simplicity?
+    Accuracy?
+
+-   Residual / error
+
+    -   $residual = y - \hat{y}$ - over predictions have negative residuals (we'll often square or absolute value when summarizing residuals to remove negatives)
+
+        -   $y$ (actual) vs $\hat{y}$ (predicted/estimated) - wizards make predictions; they have pointy hats
+
+-   Summarizing residuals ( $n$ is sample size, $y$ is observed y, $\hat{y}$ is predicted y, $\sum$ means sum, and $\frac{1}{n}\sum{y_i}$ would mean average $y$)
+
+    -   RMSE - Root mean square error - $\sqrt{\frac{1}{n}\sum{(y_i - \hat{y_i})^2}}$
+
+    -   MAE - Mean absolute error - $\frac{1}{n}\sum{|y_i - \hat{y_i}|}$
+
+-   Data prep `recipe()`s
+
+    -   `update_role(id_var, new_role = "ID")` - tell model not to use a column but don't drop it
+
+    -   Some cleaning steps
+
+        -   `step_naomit()` - exclude records with missing values
+
+        -   `step_corr()` - remove correlated features
+
+        -   `step_lincomb()` - remove features to not have any linear combinations (e.g. bmi is linear combo of height and weight)
+
+        -   `step_nzv()` - remove features with near zero variance
+
+        -   `step_dummy()` - creates dummy variables from factor predictors
+
+    -   What columns to apply steps to (not an exhaustive list); used within steps (e.g. `step_dummy(all_nominal_predictors)` and `step_nzv(all_predictors())` )
+
+        -   `all_numeric_predictors()` - apply to all numeric X
+
+        -   `all_nominal_predictors()` - apply to all numeric X
+
+        -   `all_predictors()` - apply to all X regardless of data type
+
+        -   `all_numeric()` - apply to all numeric X and y
+
+    -   To use a `recipe()`
+
+        -   Run `prep()` on your recipe to see status print outs and debug as needed
+
+        -   Add your `recipe()` to a model `workflow()` with `add_recipe()` so data is pre-processed in your workflow
+
+        -   Apply your `recipe()` using `prep()` + `bake()` - less common, but useful to see what your models will be seeing.
+            Also useful if using recipes for cleaning before unsupervised learning (e.g. clustering).
+
+-   Fitting models `workflow()`
+
+    -   Define a data cleaning recipe:
+
+        -   `my_recipe <- recipe(y ~ ., data = my_df) |> step_corr(all_predictors())`
+
+    -   Define a model:
+
+        -   `my_lm <- linear_reg()` (we'll see many more model types and options)
+
+    -   Define a workflow and add the recipe and model to the work flow
+
+        -   `my_workflow <- workflow() |> add_recipe(my_recipe) |> add_model(my_lm)`
+
+    -   Fit workflow to data
+
+        -   `my_fit_workflow <- my_workflow() |> fit(my_df)`
+
+    -   Make predictions on new data (recipe's cleaning is applied before model makes predictions)
+
+        -   `my_fit_workflow |> predict(new_data = my_new_df)`
+
+-   Measuring accuracy with `metrics()`
+
+    -   Create a data.frame with both the actual value ( $y$ ) and the predicted value ( $\hat{y}$ )
+
+        -   E.g. `my_df_w_preds <- my_fit_workflow |> predict(new_data = my_new_df) |> bind_cols(my_new_df)` (this works if `my_new_df` has the predictors and target in it)
+
+    -   Use `metrics()` function and tell it what the `truth` is and what your `estimate` is
+
+        -   E.g. `data_w_preds |> metrics(truth = actual_y, estimate = .pred)`
+
+            -   By default, `predict()` names the predicted value `.pred`
+
+-   Extracting model object with `extract_fit_engine()`
+
+    -   E.g. ``` fit_model <- y_fit_workflow``|> extract_fit_engine() ```
+
+    -   Useful if you want to do something specific to that model type.
+        For example, do this to apply `summary()` to a fit linear regression model.
+
+------------------------------------------------------------------------
+
+## Data overview
+
+The data was scraped on 2024-10-08 from [sports-reference.com](https://sports-reference.com).
+The scraped data can be found here:
+
+-   [Raw data](https://docs.google.com/spreadsheets/d/1wB3jSXi_icELvBw8fXM6GNdyP9ElzJkp_Zw7kFn1C1E/edit?usp=sharing)
+-   [Reshaped data for our activity](https://docs.google.com/spreadsheets/d/198RbUWYiA5mYklpvAE1TEqMk3ud7uh74_YKIv8Uhno0/edit?usp=sharing)
+
+Each of those can be read into R with the below code:
+
+```{r all_season_results_data, warning=FALSE}
+# Data for each game result from 2015 through 2024 week 7
+# Columns: c("date", "datetime", "day_of_week", "week", "winner",
+#            "winner_pts", "winner_rank", "loser", "loser_pts",
+#            "loser_rank", "home_team", "notes")
+raw_data_url <- "https://docs.google.com/spreadsheets/d/1wB3jSXi_icELvBw8fXM6GNdyP9ElzJkp_Zw7kFn1C1E/export?format=csv"
+
+ncaaf_df <- read.csv(raw_data_url) |>
+  mutate(time = as_datetime(paste(date, time), format = "%Y-%m-%d %I:%M %p")) |>
+  rename(datetime = time)
+
+head(ncaaf_df)
+```
+
+```{r season_summary_w_w7_data}
+# Data for wins, losses, points for, and points against;
+# totals for season and for week 1 through 7
+# Columns: c("year", "team", "win_count", "loss_count", "points_scored",
+#            "points_allowed", "win_count_w7", "loss_count_w7",
+#            "points_scored_w7", "points_allowed_w7")
+w7_data_url <- "https://docs.google.com/spreadsheets/d/198RbUWYiA5mYklpvAE1TEqMk3ud7uh74_YKIv8Uhno0/export?format=csv"
+
+w7_df <- read.csv(w7_data_url)
+
+head(w7_df)
+```
+
+------------------------------------------------------------------------
+
+## EDA
+
+Let's use the data totaled through week 7 `w7_df`.
+Start by just viewing what's going on in here.
+
+```{r w7_df_eda}
+head(w7_df)
+```
+
+## Pythagorean win-loss data manipulation
+
+Let's calculate [Pythagorean win-loss](https://en.wikipedia.org/wiki/Pythagorean_expectation) through week 7 (aka Pythagorean expectation, aka Pythagorean wins, aka Pythagorean projection).
+
+*Note: No, Pythagorean win loss will not be on any quiz/test/lab.*
+
+Pythagorean win-loss percentage in theory is a way to to show how many games a team "should have won" and "should win" if they continue with their current scoring performance.
+It compares points scored to points allowed and is trying to reflect things like: "that team isn't as good as their record, they just keep eking by with close lucky wins" and "that team's great, they're blowing out everyone".
+You can debate if you agree with what this is trying to measure and if it captures it.
+
+$$
+\frac{\text{points_scored}^2}{\text{points_scored}^2 + \text{points_allowed}^2}
+$$
+
+(according to [an implementation for the NFL](https://en.wikipedia.org/wiki/Pythagorean_expectation#Use_in_the_National_Football_League) maybe $2.37$ is a better exponent for projections than $2$)
+
+Calculate both regular win/loss percentage and Pythagorean win/loss using just statistics through week 7.
+
+```{r pythag_winloss}
+w7_df <- w7_df |>
+  mutate(pythag_winloss_w7 = points_scored_w7^2 / (points_scored_w7^2 + points_allowed_w7^2)) |>
+  mutate(winloss_w7 = win_count_w7 / (win_count_w7 + loss_count_w7)) |>
+  mutate(pythag_winloss = points_scored^2 / (points_scored^2 + points_allowed^2)) |>
+  mutate(winloss = win_count / (win_count + loss_count))
+```
+
+One of the claims with this Pythagorean win loss is that we can identify "under-performing" and "over-performing" teams (again, you can debate the rationale).
+
+Let's follow this idea.
+To start we need to calculate the difference between Pythagorean win loss and actual win loss.
+
+```{r winloss_diff}
+w7_df <- w7_df |>
+  mutate(winloss_diff_w7 = pythag_winloss_w7 - winloss_w7) |>
+  mutate(winloss_diff = pythag_winloss - winloss)
+```
+
+Who are the biggest over and under performers for 2024?
+
+Interpretation guide:
+
+-   More negative `winloss_diff_w7` -\> bigger fraud
+
+-   More positive `winloss_diff_w7` -\> more unlucky breaks
+
+```{r pythag_winloss_eda_2024}
+only_2024 <- w7_df |>
+  filter(year == 2024) |>
+  select(
+    team, win_count_w7, points_scored_w7, points_allowed_w7, 
+    pythag_winloss_w7, winloss_w7, winloss_diff_w7
+  )
+
+# Unluckiest teams
+only_2024  |>
+  arrange(desc(winloss_diff_w7)) |> 
+  head()
+
+# Biggest frauds
+only_2024  |>
+  arrange(winloss_diff_w7) |> 
+  head()
+
+# How bout them vols
+# Pythag says we're better than our record
+only_2024 |> 
+  filter(team == "Tennessee")
+```
+
+The other claim with this metric is that it can be used to project end of season wins.
+
+$$
+\text{Pythagorean wins} = \frac{\text{points_scored}^{2}}{\text{points_scored}^{2} + \text{points_allowed}^{2}} \times \text{number_of_games}
+$$
+
+Let's make some predictions for the end of season win totals.
+
+```{r pythag_projection}
+n_games = 12
+
+w7_df <- w7_df |> 
+  mutate(pythag_wins_proj_w7 = pythag_winloss_w7 * n_games)
+```
+
+One of the benefits of "supervised learning" is we can measure if we're on the right track by comparing to the right answer.
+In this case, for past seasons, if we'd used this projection, how close would we have been?
+These mistakes are called residuals or errors depending on context and who you're talking to.
+
+$$
+\text{residual} = y - \hat{y}
+$$
+
+Residual is actual ( $y$ ) minus predicted ( $\hat{y}$ ).
+"Wizard's make predictions and they wear pointy hats" - Jessica circa Jan 2022
+
+```{r pythag_residual}
+w7_df <- w7_df |> 
+  mutate(pythag_residual = win_count - pythag_wins_proj_w7)
+
+summary(w7_df$pythag_residual)
+```
+
+How can we we find the typical mistake?
+
+```{r typical_miss}
+mean(abs(w7_df$pythag_residual), na.rm = TRUE)
+sqrt(mean((w7_df$pythag_residual)^2, na.rm = TRUE))
+```
+
+Okay, how bout them Vols.
+This prediction we'll assume is under predicted...
+
+```{r how_bout_them_vols}
+w7_df |> 
+  filter(team == "Tennessee") |> 
+  filter(year == 2024) |> 
+  select(team, year, pythag_winloss_w7, pythag_wins_proj_w7)
+```
+
+According to [this one implementation for the NFL](https://en.wikipedia.org/wiki/Pythagorean_expectation#Use_in_the_National_Football_League) maybe $2.37$ is a better exponent for projections than $2$...
+
+$$
+\text{Pythagorean wins} = \frac{\text{points_scored}^{2.37}}{\text{points_scored}^{2.37} + \text{points_allowed}^{2.37}} \times \text{number_of_games}
+$$
+
+for the curious, think through how this exponent is affecting the outcome.
+Prove it out by plugging in different values for $\text{points_scored}$, $\text{points_allowed}$, and the exponent value.
+
+but what value is actually the best for NCAA football...?
+We want to choose some $t$ that seems to perform the best...
+but **how can we find the best value for** $t$**?** ( $t$ for $t$ennessee and nothing more meaningful)
+
+$$
+\text{Pythagorean wins} = \frac{\text{points_scored}^{t}}{\text{points_scored}^{t} + \text{points_allowed}^{t}} \times \text{number_of_games}
+$$
+
+$t$ is an example of a parameter that we want to "tune" to find the best value of.
+Kind of like coefficients in linear regression.
+
+**So, how might we find the best value of** $t$?
+
+*class discussion about finding best t*
+
+(p.s. if anyone looks into the best value of $t$ for 2015-2023 I'd be curious to know your answer)
+
+**Poke a hole in the logic so far? What is this "model" missing?**
+
+*class discussion about how this model is limited*
+
+**What's good about this model so far though?**
+
+*class discussion about how this model is good*
+
+------------------------------------------------------------------------
+
+## Predicting wins with linear regression
+
+Okie doke, instead of that Pythagorean stuff let's practice applying linear regression but we'll use the `tidymodels` framework.
+Can we predict end of season wins for everyone this year?
+
+Selecting down to some certain columns for modeling.
+Keeping `year` and `team` as ID variables so we can see who's who, keeping `win_count` as our *target* (y), keeping some of our week 7 statistics as *predictors* (X).
+
+```{r subset_to_model_data}
+model_data <- w7_df |>
+  select(
+    year, team, win_count, 
+    win_count_w7, points_scored_w7, 
+    points_allowed_w7, winloss_w7
+  )
+```
+
+### Using a `recipe()` for `tidymodels`
+
+We're going to predict `win_count` using all available *predictors*.
+
+-   `recipe()` - is where we outline what will be our *target* (y), our *predictors*/*features* (Xs), and what data.frame the data is coming from
+
+-   `update_role()` - I don't want to use `year` and `team` as predictors, I'd rather think of them as IDs.
+    So I'm letting the recipe know to treat them with the `role` of `ID`.
+
+-   `step_naomit()` - dropping all records with an `NA` for any of the numeric predictors
+
+-   `step_corr()` - dropping correlated predictors
+
+-   `step_lincomb()` - dropping predictors that are linear combinations of one another
+
+-   `step_nzv()` - dropping variables with near zero variance
+
+Running `prep()` let's us see some status print outs about what our recipe's results are.
+
+```{r recipe_example}
+ncaa_recipe <- recipe(win_count ~ ., data = model_data) |>
+  update_role(year, new_role = "ID") |>
+  update_role(team, new_role = "ID") |>
+  step_naomit(all_numeric_predictors()) |>
+  step_corr(all_numeric_predictors()) |>
+  step_lincomb(all_numeric_predictors()) |>
+  step_nzv(all_numeric_predictors())
+
+ncaa_recipe |>
+  prep()
+```
+
+We can use `bake()` to actually apply the cleaning steps from the `recipe()`.
+Doing this let's us view the data the same way as our predictive models will see it.
+
+```{r baked_recipe_example, warning=FALSE}
+ncaa_prepped <- ncaa_recipe |>
+  prep() |>
+  bake(model_data)
+
+ncaa_prepped
+```
+
+```{r baked_plots, warning=FALSE, echo=FALSE, fig.align='center', out.width='50%', collapse=FALSE}
+ggplot(ncaa_prepped, aes(x = win_count_w7, y = win_count)) +
+  geom_point() +
+  labs(title = "Wins through week 7 compared to end of season win total")
+
+ggplot(ncaa_prepped, aes(x = points_allowed_w7, y = win_count)) +
+  geom_point() +
+  labs(title = "Points allowed through week 7 compared to end of season win total")
+
+ggplot(ncaa_prepped, aes(x = points_scored_w7, y = win_count)) +
+  geom_point() +
+  labs(title = "Points scored week 7 compared to end of season win total")
+```
+
+### Using a `workflow()` for `tidymodels`
+
+Fitting a model is little wordier with our newer framework than just saying `lm()`, but it will payoff as a framework to fit more and more complex models.
+
+```{r workflow_example}
+ncaa_lm <- linear_reg()
+
+ncaa_workflow <- workflow() |>
+  add_recipe(ncaa_recipe) |>
+  add_model(ncaa_lm)
+
+ncaa_fit <- ncaa_workflow |>
+  fit(model_data)
+```
+
+Making predictions with our model and adding the predictions as a column to our data.
+
+```{r predictions_example}
+data_w_preds <- ncaa_fit |>
+  predict(model_data) |>
+  bind_cols(model_data) |>
+  mutate(residual = win_count - .pred)
+```
+
+We can look into our biggest misses and the distribution of our misses.
+
+```{r exploring_residuals}
+# In 2022 Fresno State had 1 win through week 7 and finished with 10 wins.
+# Our model predicted they'd only have 3.86 wins, our residual is 6.14 = 10 - 3.86.
+data_w_preds |>
+  arrange(desc(residual)) |>
+  head(5)
+
+# In 2018 Colorado had 5 wins through week 7 and finished with 5 wins.
+# Our model predicted they'd have 9.83 wins, our residual is -4.83 = 5 - 9.82.
+data_w_preds |>
+  arrange(residual) |>
+  head(5)
+
+# Our residuals are normally distrubted and cenetered around zero.
+hist(data_w_preds$residual)
+
+# We can see a five number summary of our mistakes and get a better feel for a typical miss
+# We can see our biggest mistakes of Colorado (-4.83) and Fresno State (6.14)
+summary(data_w_preds$residual)
+```
+
+### Using `metrics()` to measure accuracy
+
+Measuring the accuracy of our predictions can be done with `metrics()` it can calculate:
+
+-   RMSE - root mean squared error - $\sqrt{\frac{1}{n} \sum{(y_i - \hat{y_i})^2}}$ - "typical miss" - our model is typically withing 1.77 wins of the correct season win total
+
+    -   Subtract actual $y_i$ and predicted $\hat{y_i}$, square this residual, find the average squared residual, take square root
+
+-   $R^2$ - R squared - "variation explained" - wins, points allowed, and points scored at week 7 explain about 66% of the variation in end of season win total
+
+    -   Think of as a percentage; closer to 100% the more variation in your y is explained
+
+    -   More notes on $R^2$ in homework
+
+-   MAE - mean absolute error - $\frac{1}{n} \sum{|y_i - \hat{y_i}|}$ - "typical miss"
+
+    -   Subtract actual $y_i$ and predicted $\hat{y_i}$, calculate absolute value of this residual, take average
+
+```{r metrics_example}
+data_w_preds |>
+  metrics(truth = win_count, estimate = .pred)
+```
+
+#### MAE vs RMSE
+
+-   Very similar and often agree.
+
+-   RMSE penalizes a little more than MAE for bigger misses and RMSE rewards more than MAE for small misses (squaring numbers larger than 1 makes them get real big; squaring numbers smaller than one makes the numbers smaller)
+
+-   *WARNING CALCULUS...* RMSE and its minimum are differentiable, but MAE and it's minimum looks like `V`....
+    because of this, a lot of the machinery to optimize models is based around minimizing squared errors rather than absolute errors.
+
+### Extracting fit model from a `tidymodels` `workflow`
+
+Often you see some online tutorial doing things with the fit model but they didn't use tidymodels.
+For example, in BAS320 you could run the `summary()` function on the linear model and it would show coefficients and R squared and all that good stuff.
+For other model types it's also nice to sometimes get back their unique object type.
+We can use `extract_fit_engine()` to do this.
+
+Below `extract_fit_engine()` is applied to get the linear model object and then the `summary()` function is applied just like usual `lm()` analysis.
+
+Note the $R^2$ matches the `metrics()` output.
+
+```{r extract_model_example}
+ncaa_fit |>
+  extract_fit_engine() |>
+  summary()
+```
+
+Model marketing talk using number of training observations, RMSE, and our model written mathier:
+
+$$
+Wins_{season} \approx 3.9 + 1.08 \times Wins_{week7} + 0.01 \times PointsScored_{week7} - 0.02 \times PointsAllowed_{week7}
+$$
+
+> Based on over 1200 records from 2015 through 2023.
+> Model predictions are typically within +/-1.7 games of correct win total.
+
+Okay...
+finally...
+let's view the prediction for Tennessee 2014
+
+```{r how_bout_them_got_dang_vols}
+data_w_preds |>
+  filter(team == "Tennessee") |>
+  filter(year == 2024)
+```
+
+------------------------------------------------------------------------
+
+## The scraping code
+
+The code used to scrape this football record data from sports-reference.com.
+Don't run the code willy nilly, sports-reference doesn't love scrapers.
+I'd be more than happy to talk to you about scraping and how to try and do it morally/respectfully.
+
+``` r
+library(rvest)
+library(httr)
+
+all_tables <- list()
+for (year in 2015:2024) {
+  data_url <- paste0("https://www.sports-reference.com/cfb/years/", year, "-schedule.html")
+
+  cat("Pulling", data_url, "(year:", year, ")...\n")
+  if (year > 2015) {
+    wait_time <- runif(n = 1, min = 10, max = 40)
+    cat("\t...waiting about", round(wait_time), "seconds before request\n")
+    Sys.sleep(wait_time)
+  }
+
+  response <- GET(data_url)
+  year_data <- response |>
+    content(encoding = "UTF-8") |>
+    html_table()
+
+  year_data <- year_data[[1]]
+
+  names(year_data) <- c(
+    "row_num", "week", "date", "time",
+    "day_of_week", "winner", "winner_pts",
+    "home_team", "loser", "loser_pts", "notes"
+  )
+
+  year_data <- year_data |>
+    filter(row_num != "Rk") |>
+    mutate(loser_rank = str_extract(loser, "^\\((\\d+)\\)", group = 1) |> as.numeric()) |>
+    mutate(winner_rank = str_extract(winner, "^\\((\\d+)\\)", group = 1) |> as.numeric()) |>
+    mutate(loser = str_remove(loser, "^\\(\\d+\\)\\s")) |>
+    mutate(winner = str_remove(winner, "^\\(\\d+\\)\\s")) |>
+    mutate(home_team = ifelse(home_team == "N", "neutral", home_team)) |>
+    mutate(home_team = ifelse(home_team == "@", loser, home_team)) |>
+    mutate(home_team = ifelse(home_team == "", winner, home_team)) |>
+    mutate(date = as.Date(date, format = "%b %d, %Y")) |>
+    select(
+      date, time, day_of_week, week, winner,
+      winner_pts, winner_rank, loser, loser_pts,
+      loser_rank, home_team, notes
+    )
+
+  all_tables[[length(all_tables) + 1]] <- year_data[[1]]
+}
+
+ncaaf_df <- do.call(bind_rows, all_tables)
+write.csv(ncaaf_df, "ncaaf_2015_2024.csv", row.names = FALSE)
+```
